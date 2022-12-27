@@ -1,45 +1,89 @@
 // SPDX-License-Identifier: MIT
 
+// Pragma
 pragma solidity ^0.8.0;
+
+// Import
 import "./PriceConverter.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "hardhat/console.sol";
 
-contract Fundme {
+// Errors
+error FundMe__NotOwner();
+error FundMe__NotSendEnoughETH();
+error FundMe__WithdrawFail();
+
+/** @title A contract for crowd funding
+ *  @author Chris Lin
+ *  @notice This contract is to demo a simple funding contract
+ *  @dev This implements price feed as our library
+ */
+contract FundMe {
+    // Type Declarations
     using PriceConverter for uint256;
 
-    uint256 minUsd = 10 * 1e18;
-    address[] public funders;
-    mapping(address => uint256) public funderToContribution;
-    address public immutable i_owner;
+    // State variables
+    address[] private s_funders;
+    mapping(address => uint256) private s_funderToContribution;
+    address private immutable i_owner;
+    uint256 constant MIN_USD = 10 * 1e18;
+    AggregatorV3Interface private s_priceFeed;
 
-    AggregatorV3Interface public priceFeed;
+    // Events
+
+    // Modifiers
+    modifier onlyOwner() {
+        if (msg.sender != i_owner) revert FundMe__NotOwner();
+        // require(
+        //     msg.sender == i_owner,
+        //     "You don't have permission to withdraw the fund !"
+        // );
+        _;
+    }
+
+    // Functions:
+    //// constructor
+    //// receive
+    //// fallback
+    //// external
+    //// public
+    //// internal
+    //// private
+    //// view / pure
 
     constructor(address priceFeedAddress) {
         i_owner = msg.sender;
-        priceFeed = AggregatorV3Interface(priceFeedAddress);
+        s_priceFeed = AggregatorV3Interface(priceFeedAddress);
     }
+
+    // receive() external payable {
+    //     fund();
+    // }
+
+    // fallback() external payable {
+    //     fund();
+    // }
 
     function fund() public payable {
-        require(
-            msg.value.ethToUsd(priceFeed) >= minUsd,
-            "Didn't send enough at least 50$"
-        );
-        funders.push(msg.sender);
-        if (funderToContribution[msg.sender] != 0) {
-            funderToContribution[msg.sender] += msg.value;
-        } else {
-            funderToContribution[msg.sender] = msg.value;
-        }
+        if (msg.value.ethToUsd(s_priceFeed) < MIN_USD)
+            revert FundMe__NotSendEnoughETH();
+        // require(
+        //     msg.value.ethToUsd(s_priceFeed) >= MIN_USD,
+        //     "Didn't send enough at least 50$"
+        // );
+        s_funderToContribution[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
     }
 
-    function withdraw() public onlyOwner {
+    function withdraw() public payable onlyOwner {
+        address[] memory funders = s_funders;
         for (uint256 i = 0; i < funders.length; i++) {
             address funder = funders[i];
-            funderToContribution[funder] = 0;
+            s_funderToContribution[funder] = 0;
         }
 
         // Reset array
-        funders = new address[](0);
+        s_funders = new address[](0);
 
         // 3 ways to send ETH:
 
@@ -51,25 +95,26 @@ contract Fundme {
         // require(sendSuccess, "Fail to withdraw the balance !");
 
         // Call - most common way
-        (bool callSuccess, ) = payable(msg.sender).call{
-            value: address(this).balance
-        }("");
-        require(callSuccess, "Fail to withdraw the balance !");
+        (bool callSuccess, ) = i_owner.call{value: address(this).balance}("");
+        // require(callSuccess, "Fail to withdraw the balance !");
+        if (!callSuccess) revert FundMe__WithdrawFail();
     }
 
-    modifier onlyOwner() {
-        require(
-            msg.sender == i_owner,
-            "You don't have permission to withdraw the fund !"
-        );
-        _;
+    function getOwner() public view returns (address) {
+        return i_owner;
     }
 
-    receive() external payable {
-        fund();
+    function getFunders(uint256 _index) public view returns (address) {
+        return s_funders[_index];
     }
 
-    fallback() external payable {
-        fund();
+    function getAddressToContribution(
+        address _address
+    ) public view returns (uint256) {
+        return s_funderToContribution[_address];
+    }
+
+    function getPriceFeed() public view returns (AggregatorV3Interface) {
+        return s_priceFeed;
     }
 }
