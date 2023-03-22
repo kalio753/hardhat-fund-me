@@ -54,6 +54,12 @@ contract FundMe {
     constructor(address priceFeedAddress) {
         i_owner = msg.sender;
         s_priceFeed = AggregatorV3Interface(priceFeedAddress);
+
+        // Because the default use of the priceFeed is like so to get
+        // price feed from chain:
+        // AggregatorV3Interface priceFeed = AggregatorV3Interface(
+        //     0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e
+        // );
     }
 
     // receive() external payable {
@@ -69,7 +75,7 @@ contract FundMe {
             revert FundMe__NotSendEnoughETH();
         // require(
         //     msg.value.ethToUsd(s_priceFeed) >= MIN_USD,
-        //     "Didn't send enough at least 50$"
+        //     "Didn't send enough at least 10$"
         // );
         s_funderToContribution[msg.sender] += msg.value;
         s_funders.push(msg.sender);

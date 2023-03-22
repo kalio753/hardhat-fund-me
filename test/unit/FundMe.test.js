@@ -152,5 +152,9 @@ const { developmentChain } = require("../../helper-hardhat-config")
                       attackerConnectedContract.withdraw()
                   ).to.be.revertedWith("FundMe__NotOwner")
               })
+
+              it("check if is the owner", async () => {
+                  assert.equal(await fundMe.getOwner(), deployer)
+              })
           })
       })
